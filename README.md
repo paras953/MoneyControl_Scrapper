@@ -5,3 +5,5 @@ Run get_stocks_link.py to get the csv which gives the endpoints to hit (ie the p
 This scraping script is not suggested for intraday trading but for something longer say a week,month......
 
 Python version 3.6.9
+
+
