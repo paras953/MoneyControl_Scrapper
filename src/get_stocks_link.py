@@ -7,6 +7,9 @@ import re
 import traceback
 import string
 
+PROJECT_ROOT = os.path.abspath(os.path.dirname('src'))
+PROJECT_ROOT=PROJECT_ROOT.replace('src','')+'output/'
+
 options = webdriver.ChromeOptions()
 options.headless = True
 options.add_argument('--no-sandbox')
@@ -50,4 +53,4 @@ for index,url in enumerate(final_url_list):
 
 print('DF starts now')
 df=pd.DataFrame(log_list)
-df.to_csv('moneycontrol_stock_list.csv',index=False)
+df.to_csv(PROJECT_ROOT+'moneycontrol_stock_list.csv',index=False)

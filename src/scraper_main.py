@@ -1,7 +1,7 @@
 from stock_info import StockScraper
 import pandas as pd
 from datetime import datetime
-
+import os
 
 '''
 Sample for one url
@@ -18,15 +18,24 @@ eg 2: {'company_name': 'Housing Development Finance Corporation Ltd.', 'sector':
 
 '''
 
-df=pd.read_csv('moneycontrol_stock_list.csv')
+PROJECT_ROOT = os.path.abspath(os.path.dirname('src'))
+PROJECT_ROOT=PROJECT_ROOT.replace('src','')+'output/'
+
+df=pd.read_csv(PROJECT_ROOT+'moneycontrol_stock_list.csv')
 
 log_list=[]
-for rows in df.iterrows():
+for index,rows in df.iterrows():
 	
 	stock_obj=StockScraper()
+	print(rows['link'])
 	data_dict=stock_obj.aggregate_data(rows['link'])
 	log_list.append(data_dict)
-
+	
+	'''
+	comment below line ...just added to check the output
+	'''
+	if index>20:
+		break
 
 print('Data scraping Done')	
 
@@ -38,4 +47,5 @@ today=datetime.now()
 date_time = today.strftime("%d/%m/%Y  %H:%M:%S")
 date=today.strftime("%d-%m-%Y")
 df['date']=date_time
-df.to_csv('Stocks_aggregated_'+date+'.csv')
+df.fillna('NA',inplace=True)
+df.to_csv(PROJECT_ROOT+'Stocks_aggregated_'+date+'.csv')

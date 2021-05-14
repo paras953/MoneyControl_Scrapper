@@ -15,6 +15,7 @@ options.add_argument("--incognito")
 
 class StockScraper():
 	def __init__(self):
+		#useful variables
 		self.technicals_link_daily=None
 		self.technicals_link_weekly=None
 		self.technicals_link_monthly=None
@@ -27,6 +28,8 @@ class StockScraper():
 		self.final_dict={}
 		self.base_scraper=None
 		self.broker_research={}
+		self.price_scraper=None
+		self.price_data={}
 
 	def get_base_data(self,base_url):
 		#1st method to call
@@ -84,10 +87,19 @@ class StockScraper():
 			
 			#self.essentials['mc_essentials']=soup.findAll('div',{'class':'bx_mceti mc_essenclick'})[0].findAll('div',{"class":'esbx esbx3'})[0].text
 			
-
-			self.essentials['company_financial_score']=soup.findAll('div',{'class':'fpioi'})[0].findAll('div')[-1].text
-			self.essentials['company_financials_comment']=soup.findAll('div',{'class':'fpioi'})[0].findAll('p')[0].text
-			self.essentials['mc_insight']=soup.findAll('div',{'id':'mc_insight'})[0].findAll('div')[1].findAll('p')[0].findAll('strong')[0].text
+			try:
+				self.essentials['company_financial_score']=soup.findAll('div',{'class':'fpioi'})[0].findAll('div')[-1].text
+			except Exception as e:
+				self.essentials['company_financial_score']='NA'
+			try:
+				self.essentials['company_financials_comment']=soup.findAll('div',{'class':'fpioi'})[0].findAll('p')[0].text
+			except Exception as e:
+				self.essentials['company_financials_comment']='NA'
+			try:
+				self.essentials['mc_insight']=soup.findAll('div',{'id':'mc_insight'})[0].findAll('div')[1].findAll('p')[0].findAll('strong')[0].text
+			except Exception as e:
+				print('No insight found')
+				self.essentials['mc_insight']='NA'
 
 			company_rev=soup.findAll('table',{'class':'frevdat'})[0]
 			row_list=company_rev.findAll('tr')
@@ -117,6 +129,7 @@ class StockScraper():
 			driver = webdriver.Chrome(options=options)
 			driver.get(self.technicals_link_daily)
 			soup_daily=bs4(driver.page_source.encode('utf-8'),'lxml')
+			self.price_scraper=soup_daily #for bese/nse price
 			driver.quit() #Exiting now will use only when needed
 
 
@@ -159,12 +172,34 @@ class StockScraper():
 						self.technicals[time_range]['rating']=possible_ids[ids]
 						break
 
+
+
+
 			return 0
 		except Exception as e:
 			print(e)
 			traceback.print_exc()
 			print('Scrape technical failed {}'.format(time_range))
 			return 1
+
+	def get_price_data(self):
+		try:
+
+			print('get_price_data called')
+			soup=self.price_scraper
+			self.price_data['bse_price']=soup.findAll('div',{'class':'bsedata_bx'})[0].findAll('div',{'class':'pcnsb div_live_price_wrap'})[0].findAll('span')[0].text
+			self.price_data['nse_price']=soup.findAll('div',{'class':'nsedata_bx'})[0].findAll('div',{'class':'pcnsb div_live_price_wrap'})[0].findAll('span')[0].text
+			self.price_data['bse_vol']=soup.findAll('div',{'class':'bsedata_bx'})[0].findAll('span',{'class':'txt13_pc volume_data'})[0].text
+			self.price_data['nse_vol']=soup.findAll('div',{'class':'nsedata_bx'})[0].findAll('span',{'class':'txt13_pc volume_data'})[0].text
+			return 0
+
+		except Exception as e:
+			print(e)
+			print('get_price_data failed')
+			traceback.print_exc()
+			return 1
+
+
 
 
 	def get_user_sentiment(self):
@@ -189,6 +224,7 @@ class StockScraper():
 				return 1
 		except Exception as e:
 			print(e)
+			print('get_user_sentiment failed')
 			traceback.print_exc()
 			return 1
 
@@ -273,6 +309,10 @@ class StockScraper():
 			self.update_data(self.user_sentiment,dict_type='user_sentiment')
 
 		result_broker=self.get_broker_research()
+
+		result_price_data=self.get_price_data()
+		if result_price_data==0:
+			self.update_data(self.price_data,dict_type='price_data')
 
 		if result_broker==0:
 			self.update_data(self.broker_research,dict_type='broker_research')
