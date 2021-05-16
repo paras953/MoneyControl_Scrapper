@@ -5,7 +5,13 @@ import string
 import pandas as pd
 import re
 import traceback
+import requests
+import time
 
+'''
+Used selenium in the earlier version but found requests works too and it is faster
+,switching to requests now
+'''
 
 options = webdriver.ChromeOptions()
 options.headless = True
@@ -36,11 +42,13 @@ class StockScraper():
 
 		print('Get base data called')
 		try:
-			driver = webdriver.Chrome(options=options)
-			driver.get(base_url)
-			soup=bs4(driver.page_source.encode('utf-8'),'lxml')
+			#driver = webdriver.Chrome(options=options)
+			#driver.get(base_url)
+			response=requests.request("GET",url=base_url)
+
+			soup=bs4(response.content.decode('utf-8'),'lxml')
 			self.base_scraper=soup
-			driver.quit() #Exiting now will use only when needed
+			#driver.quit() #Exiting now will use only when needed
 
 			table=soup.findAll('div',{'class':'bx_mceti'})
 
@@ -101,13 +109,18 @@ class StockScraper():
 				print('No insight found')
 				self.essentials['mc_insight']='NA'
 
-			company_rev=soup.findAll('table',{'class':'frevdat'})[0]
-			row_list=company_rev.findAll('tr')
-			
-			self.essentials['rev_growth']=row_list[0].findAll('td')[1].text
-			self.essentials['net_profit']=row_list[1].findAll('td')[1].text
-			self.essentials['operating_profit']=row_list[2].findAll('td')[1].text
-
+			try:
+				company_rev=soup.findAll('table',{'class':'frevdat'})[0]
+				row_list=company_rev.findAll('tr')			
+				self.essentials['rev_growth']=row_list[0].findAll('td')[1].text
+				self.essentials['net_profit']=row_list[1].findAll('td')[1].text
+				self.essentials['operating_profit']=row_list[2].findAll('td')[1].text
+			except Exception as e:
+				print(e)
+				print('No revenue found')
+				self.essentials['rev_growth']='NA'
+				self.essentials['net_profit']='NA'
+				self.essentials['operating_profit']='NA'
 
 
 			print('Done with base data')
@@ -126,25 +139,28 @@ class StockScraper():
 				print('No technical link found')
 				return 1
 
-			driver = webdriver.Chrome(options=options)
-			driver.get(self.technicals_link_daily)
-			soup_daily=bs4(driver.page_source.encode('utf-8'),'lxml')
+			#driver = webdriver.Chrome(options=options)
+			#driver.get(self.technicals_link_daily)
+			response=requests.request("GET",url=self.technicals_link_daily)
+			soup_daily=bs4(response.content.decode('utf-8'),'lxml')
 			self.price_scraper=soup_daily #for bese/nse price
-			driver.quit() #Exiting now will use only when needed
+			#driver.quit() #Exiting now will use only when needed
 
 
 			self.technicals_link_weekly=self.technicals_link_daily.replace('daily','weekly')
 			self.technicals_link_monthly=self.technicals_link_daily.replace('daily','monthly')
 
-			driver = webdriver.Chrome(options=options)
-			driver.get(self.technicals_link_weekly)
-			soup_weekly=bs4(driver.page_source.encode('utf-8'),'lxml')
-			driver.quit() #Exiting now will use only when needed
+			#driver = webdriver.Chrome(options=options)
+			#driver.get(self.technicals_link_weekly)
+			response=requests.request("GET",url=self.technicals_link_weekly)
+			soup_weekly=bs4(response.content.decode('utf-8'),'lxml')
+			#driver.quit() #Exiting now will use only when needed
 
-			driver = webdriver.Chrome(options=options)
-			driver.get(self.technicals_link_monthly)
-			soup_monthly=bs4(driver.page_source.encode('utf-8'),'lxml')
-			driver.quit() #Exiting now will use only when needed
+			#driver = webdriver.Chrome(options=options)
+			#driver.get(self.technicals_link_monthly)
+			response=requests.request("GET",url=self.technicals_link_monthly)
+			soup_monthly=bs4(response.content.decode('utf-8'),'lxml')
+			#driver.quit() #Exiting now will use only when needed
 
 			#method calls for getting technicl data
 			self.scrape_technical(time_range='daily',scraper_obj=soup_daily)
@@ -159,6 +175,7 @@ class StockScraper():
 
 	def scrape_technical(self,time_range,scraper_obj):
 		#time_range can be one of daily/weekly/monthly
+		
 		try:
 			tech_ids={'daily':'techan_daily','weekly':'techan_weekly','monthly':'techan_monthly'}
 			possible_ids={'bulishbar verybearish':'Very Bearish','bulishbar bearish':'Bearish','bulishbar neutral':'Neutral','bulishbar bullish':'Bullish','bulishbar verybullish':'Very Bullish'}
@@ -172,10 +189,8 @@ class StockScraper():
 						self.technicals[time_range]['rating']=possible_ids[ids]
 						break
 
-
-
-
 			return 0
+		
 		except Exception as e:
 			print(e)
 			traceback.print_exc()
@@ -290,27 +305,49 @@ class StockScraper():
 	def aggregate_data(self,url):
 		final_dict={}
 		print('Aggregate data called')
+		
+		start=time.time()
 		result_base_data=self.get_base_data(base_url=url)
+		end=time.time()
+
+		print('Time for base data {} s'.format(end-start))
+
 		if result_base_data==0:
 			self.update_data(self.company_details,dict_type='company_details')
 			self.update_data(self.overview_details,dict_type='overview_details')
 			self.update_data(self.essentials,dict_type='essentials')
 
+		start=time.time()
 		result_technicals=self.get_technical_data()
+		end=time.time()
+
+		print('Time for technical data {} s'.format(end-start))
 
 		if result_technicals==0:
+			
+			
 			self.update_data(self.technicals,dict_type='technicals',time_range='daily')
 			self.update_data(self.technicals,dict_type='technicals',time_range='weekly')
 			self.update_data(self.technicals,dict_type='technicals',time_range='monthly')
+			
 
+			
+		#No  need for time stats since req already made
 		result_user_sentiment=self.get_user_sentiment()
+		
+
+		
 
 		if result_user_sentiment==0:
 			self.update_data(self.user_sentiment,dict_type='user_sentiment')
 
+		#No  need for time stats since req already made
 		result_broker=self.get_broker_research()
 
+		#No  need for time stats since req already made
 		result_price_data=self.get_price_data()
+		
+
 		if result_price_data==0:
 			self.update_data(self.price_data,dict_type='price_data')
 
